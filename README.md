@@ -1,3 +1,12 @@
+---
+title: PortOps-LLM Environment
+emoji: 🚢
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
 # PortOps-LLM 🚢
 
 **Container Relocation Problem (CRP) — OpenEnv LLM Evaluation Environment**
