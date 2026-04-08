@@ -164,7 +164,7 @@ def state() -> Dict[str, Any]:
 # ─────────────────────────────────────────
 # Dev entry point
 # ─────────────────────────────────────────
-if __name__ == "__main__":
+def main():
     import uvicorn
     uvicorn.run(
         "server.app:app",
@@ -173,3 +173,6 @@ if __name__ == "__main__":
         reload=False,
         log_level="info",
     )
+
+if __name__ == "__main__":
+    main()
