@@ -1,0 +1,182 @@
+# PortOps-LLM — OpenEnv Environment Manifest
+# ===========================================
+# Strictly compliant openenv.yaml for hackathon submission.
+# Validated by: openenv validate --verbose
+
+name: "portops-llm"
+version: "1.0.0"
+description: >
+  PortOps-LLM simulates the Container Relocation Problem (CRP).
+  An LLM agent acts as a Terminal Operating System (TOS) managing
+  a 5-Bay × 4-Tier container yard. The agent receives text-based
+  observations and must issue move() or retrieve() commands to
+  efficiently sort and retrieve containers without violating
+  physical constraints. Episode limit is 8 steps.
+
+author: "PortOps Team"
+license: "MIT"
+tags:
+  - logistics
+  - container-yard
+  - reinforcement-learning
+  - llm-evaluation
+  - planning
+
+# ─── Entry Point ───────────────────────────────────────────────
+entrypoint: "server/app.py"
+env_class: "env.PortOpsEnv"
+action_class: "env.ActionSpace"
+observation_class: "env.ObservationSpace"
+
+# ─── Runtime Specification ─────────────────────────────────────
+runtime:
+  python_version: "3.10"
+  port: 7860
+  host: "0.0.0.0"
+  server_command: "uvicorn server.app:app --host 0.0.0.0 --port 7860 --workers 1"
+  requirements_file: "requirements.txt"
+
+# ─── Environment Specs ─────────────────────────────────────────
+environment_specs:
+  max_steps: 8
+  observation_type: "text"
+  action_type: "text"
+  yard_width_bays: 5
+  yard_height_tiers: 4
+  deterministic: true
+  seed_required: true
+
+# ─── Tasks ─────────────────────────────────────────────────────
+tasks:
+  - id: 1
+    name: "The Extraction"
+    difficulty: "easy"
+    description: >
+      Five containers are pre-placed in the yard. The outbound request
+      targets a container buried at the bottom of a 3-tier stack.
+      The agent must relocate blocking containers and retrieve the target.
+    setup:
+      num_containers_in_yard: 5
+      inbound_queue_size: 0
+      outbound_requests: 1
+      weight_constraints: false
+      hazmat_constraints: false
+    grader:
+      type: "deterministic"
+      formula: "max(0.0, 1.0 - 0.2 * (actual_moves - optimal_moves))"
+      zero_condition: "target_not_retrieved_within_8_steps"
+      score_range: [0.0, 1.0]
+
+  - id: 2
+    name: "Temporal Allocation"
+    difficulty: "medium"
+    description: >
+      The yard is empty. Eight inbound containers arrive with randomized
+      departure days (1–5). The agent must place all containers such that
+      containers with earlier departure days are accessible without
+      having to move later-departing containers.
+    setup:
+      num_containers_in_yard: 0
+      inbound_queue_size: 8
+      outbound_requests: 0
+      departure_day_range: [1, 5]
+      weight_constraints: false
+      hazmat_constraints: false
+    grader:
+      type: "deterministic"
+      formula: "max(0.0, 1.0 - 0.15 * temporal_inversions)"
+      temporal_inversion_definition: >
+        A pair where a container with a later departure_day is physically
+        stacked directly on top of a container with an earlier departure_day.
+      score_range: [0.0, 1.0]
+
+  - id: 3
+    name: "Hazmat and Weight Constraints"
+    difficulty: "hard"
+    description: >
+      The yard is densely packed with 12 containers (mix of Heavy/Light
+      and Hazmat). The agent must retrieve one specific container AND
+      place two inbound containers, without triggering fatal violations.
+    setup:
+      num_containers_in_yard: 12
+      inbound_queue_size: 2
+      outbound_requests: 1
+      weight_constraints: true
+      hazmat_constraints: true
+    constraints:
+      fatal_errors:
+        - name: "heavy_on_light"
+          description: "Placing a Heavy container on top of a Light container"
+          penalty: "immediate_zero"
+        - name: "hazmat_adjacency"
+          description: >
+            Placing a Hazmat container in a bay immediately adjacent to a bay
+            that already contains at least one Hazmat container.
+          penalty: "immediate_zero"
+    grader:
+      type: "deterministic"
+      formula: "max(0.0, 1.0 - 0.1 * unnecessary_steps)"
+      unnecessary_steps_definition: "steps_taken - minimum_required_steps (4)"
+      zero_condition: "any_fatal_constraint_violation"
+      score_range: [0.0, 1.0]
+
+# ─── API Endpoints ─────────────────────────────────────────────
+api:
+  endpoints:
+    - path: "/reset"
+      method: "POST"
+      description: "Reset the environment for a given task_id and seed"
+      request_schema:
+        task_id:
+          type: integer
+          required: false
+          default: 1
+          description: "Task identifier (1, 2, or 3)"
+        seed:
+          type: integer
+          required: false
+          default: 42
+          description: "Random seed for deterministic initialization"
+
+    - path: "/step"
+      method: "POST"
+      description: "Execute one action and return the updated observation"
+      request_schema:
+        command:
+          type: string
+          required: true
+          description: >
+            Action command. Must be one of:
+              move(CONTAINER_ID, BAY_NUMBER)  — Bay numbers are 1-based integers 1–5
+              retrieve(CONTAINER_ID)
+
+    - path: "/state"
+      method: "GET"
+      description: "Return the raw internal environment state as a JSON dict"
+
+    - path: "/health"
+      method: "GET"
+      description: "Liveness probe"
+
+# ─── Action Format Specification ────────────────────────────────
+action_format:
+  grammar: |
+    command ::= move_cmd | retrieve_cmd
+    move_cmd ::= "move(" container_id ", " bay_number ")"
+    retrieve_cmd ::= "retrieve(" container_id ")"
+    container_id ::= [A-Z][0-9]{2}        # e.g. C01, C12
+    bay_number ::= "1" | "2" | "3" | "4" | "5"
+  examples:
+    - "move(C03, 2)"       # Move container C03 to Bay 2
+    - "move(C08, 4)"       # Move container C08 to Bay 4
+    - "retrieve(C01)"      # Retrieve container C01 from the yard
+  invalid_examples:
+    - "move(C01, 0)"       # Bay 0 does not exist (1-based)
+    - "move(C01, 6)"       # Bay 6 out of range
+    - "grab C01"           # Wrong format — must use function syntax
+
+# ─── Hugging Face Spaces Deployment ────────────────────────────
+huggingface_spaces:
+  sdk: "docker"
+  app_port: 7860
+  hardware: "cpu-basic"

@@ -1,0 +1,31 @@
+# ─── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ─── Environment & Secrets ────────────────────────────────────
+.env
+# Keep .env.example — it's the safe template
+
+# ─── Testing ──────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ─── Docker ───────────────────────────────────────────────────
+*.tar
+
+# ─── IDE ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+
+# ─── Results / Logs ───────────────────────────────────────────
+results_*.json
+*.log
