@@ -35,8 +35,8 @@ from openai import OpenAI
 # ─────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+API_BASE_URL = os.getenv("API_BASE_URL", os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"))
+MODEL_NAME = os.getenv("MODEL_NAME", os.getenv("PORTOPS_MODEL", "gpt-4o-mini"))
 HF_TOKEN = os.getenv("HF_TOKEN")
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 
@@ -78,6 +78,12 @@ No -> Check Inbound Queue.
 Is there an inbound container?
 Yes -> Move it to a safe Bay listed in SAFE MOVES.
 No -> If both lists are empty, you have finished the task.
+CRITICAL RULES:
+1. You can ONLY retrieve a container if its ID is explicitly listed in "outbound_requests" AND it is at the very top of its bay.
+2. If "outbound_requests" is empty, your new goal is to place containers from the "inbound_queue" into the yard.
+3. To place an inbound container, use: move(inbound_container_id, target_bay_number).
+4. NEVER retrieve a container that is not in the outbound_requests list. 
+5. Always pick an action from the "SAFE MOVES" list provided in your observation.
 """).strip()
 
 
@@ -248,9 +254,7 @@ def run_agent(
         print("   Start the server first: uvicorn server.app:app --port 7860")
         sys.exit(1)
 
-    # ── Initialize OpenAI client ───────────────────────────────
-    # We use the strictly required checklist variables for initialization
-    client_api_key = api_key or HF_TOKEN or os.getenv("OPENAI_API_KEY", "dummy-key-for-local")
+    client_api_key = openai_api_key or os.getenv("OPENAI_API_KEY") or HF_TOKEN or "dummy-key-for-local"
     
     llm = OpenAI(
         api_key=client_api_key,
