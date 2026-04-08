@@ -35,6 +35,11 @@ from openai import OpenAI
 # ─────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+HF_TOKEN = os.getenv("HF_TOKEN")
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
+
 DEFAULT_BASE_URL: str = os.getenv("PORTOPS_BASE_URL", "http://localhost:7860")
 MAX_STEPS: int = 8
 MAX_RETRIES_ON_PARSE_FAIL: int = 2   # extra LLM calls if action format is wrong
@@ -244,11 +249,12 @@ def run_agent(
         sys.exit(1)
 
     # ── Initialize OpenAI client ───────────────────────────────
-    api_key = openai_api_key or os.getenv("OPENAI_API_KEY", "")
-    openai_base_url = os.getenv("OPENAI_BASE_URL")  # None = use official OpenAI endpoint
+    # We use the strictly required checklist variables for initialization
+    client_api_key = api_key or HF_TOKEN or os.getenv("OPENAI_API_KEY", "dummy-key-for-local")
+    
     llm = OpenAI(
-        api_key=api_key,
-        base_url=openai_base_url,   # None defaults to https://api.openai.com/v1
+        api_key=client_api_key,
+        base_url=API_BASE_URL,
     )
 
     # ── Reset environment ──────────────────────────────────────
@@ -385,8 +391,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42,
                         help="Random seed for deterministic environment setup (default: 42)")
     parser.add_argument("--model", type=str,
-                        default=os.getenv("PORTOPS_MODEL", "gpt-4o-mini"),
-                        help="OpenAI model name (default: gpt-4o-mini)")
+                        default=MODEL_NAME,
+                        help=f"OpenAI model name (default: {MODEL_NAME})")
     parser.add_argument("--base-url", type=str, default=DEFAULT_BASE_URL,
                         help=f"PortOps server base URL (default: {DEFAULT_BASE_URL})")
     parser.add_argument("--api-key", type=str, default=None,

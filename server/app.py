@@ -122,11 +122,13 @@ def root() -> Dict[str, Any]:
 
 
 @app.post("/reset", response_model=ObservationSpace, tags=["environment"])
-def reset(body: ResetRequest) -> ObservationSpace:
+def reset(body: Optional[ResetRequest] = None) -> ObservationSpace:
     """
     Reset the environment to the start of a new episode.
     Returns the initial observation.
     """
+    if body is None:
+        body = ResetRequest()
     try:
         obs = _env.reset(task_id=body.task_id, seed=body.seed)
         return obs
