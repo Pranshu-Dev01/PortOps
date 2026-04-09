@@ -213,8 +213,20 @@ def call_llm(
         # For OpenAI/other providers, stop at newline — commands are single-line
         kwargs["stop"] = ["\n"]
 
-    response = client.chat.completions.create(**kwargs)
-    content = response.choices[0].message.content or ""
+    content = ""
+    for attempt in range(3):
+        try:
+            response = client.chat.completions.create(**kwargs)
+            content = response.choices[0].message.content or ""
+            break
+        except Exception as e:
+            if verbose:
+                print(f"  [LLM] API Error: {e}. Retrying ({attempt+1}/3)...")
+            import time
+            time.sleep(2)
+            
+    if not content:
+        return ""
 
     # Always strip and take only the first line (guards against Gemini verbosity)
     first_line = content.strip().split("\n")[0].strip()
