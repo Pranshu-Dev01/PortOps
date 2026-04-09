@@ -163,7 +163,7 @@ class TestTask1:
         act(env, "move(C02, 3)")
         obs, reward, done, info = act(env, "retrieve(C01)")
         assert done is True
-        assert info["score"] == pytest.approx(1.0)
+        assert info["score"] == pytest.approx(0.99)
 
     def test_extra_moves_reduce_score(self):
         """One extra move: C03→Bay2, C02→Bay3, C02→Bay4, retrieve C01. Score = 0.8."""
@@ -181,7 +181,7 @@ class TestTask1:
         for _ in range(MAX_STEPS):
             obs, reward, done, info = act(env, "move(C03, 2)")
         assert done is True
-        assert info["score"] == pytest.approx(0.0)
+        assert info["score"] == pytest.approx(0.01)
 
     def test_cannot_move_to_full_bay(self):
         env, obs = make_env(task_id=1)
@@ -233,7 +233,7 @@ class TestTask2:
             obs, reward, done, info = act(env, f"move({first_id}, {bay + 1})")
         # Score depends on actual inversions — just ensure it's within [0,1]
         if done:
-            assert 0.0 <= info["score"] <= 1.0
+            assert 0.01 <= info["score"] <= 0.99
 
     def test_temporal_inversion_counter(self):
         """Manually verify the inversion counting helper."""
@@ -272,7 +272,7 @@ class TestTask3:
         # C13 is the first inbound Heavy container
         obs2, reward, done, info = act(env, "move(C13, 1)")  # Bay 1 top = C03 (Light)
         assert done is True
-        assert info["score"] == pytest.approx(0.0)
+        assert info["score"] == pytest.approx(0.01)
         assert env._fatal_error is True
 
     def test_fatal_hazmat_adjacency(self):
@@ -283,7 +283,7 @@ class TestTask3:
         # Now try placing C14 (Hazmat) in Bay 3 — Bay 2 has hazmat (C04)
         obs2, reward, done, info = act(env, "move(C14, 3)")
         assert done is True
-        assert info["score"] == pytest.approx(0.0)
+        assert info["score"] == pytest.approx(0.01)
         assert env._fatal_error is True
 
     def test_valid_heavy_on_heavy_ok(self):

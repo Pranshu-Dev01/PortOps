@@ -301,7 +301,8 @@ class PortOpsEnv:
         
         if self._fatal_error:
             self._done = True
-            return self._build_observation(), 0.0, True, {"reason": "Fatal error", "score": 0.0}
+            score = self._compute_final_score()
+            return self._build_observation(), 0.0, True, {"reason": "Fatal error", "score": score}
 
         if self._is_task_complete() or self._step_count >= MAX_STEPS:
             self._done = True
@@ -363,11 +364,12 @@ class PortOpsEnv:
         return False
 
     def _compute_final_score(self) -> float:
-        if self._fatal_error: return 0.0
-        if self._task_id == 1: return self._grade_task1()
-        if self._task_id == 2: return self._grade_task2()
-        if self._task_id == 3: return self._grade_task3()
-        return 0.0
+        score = 0.01
+        if not self._fatal_error:
+            if self._task_id == 1: score = self._grade_task1()
+            elif self._task_id == 2: score = self._grade_task2()
+            elif self._task_id == 3: score = self._grade_task3()
+        return max(0.01, min(0.99, score))
 
     def _grade_task1(self) -> float:
         if self._outbound_requests: return 0.0
