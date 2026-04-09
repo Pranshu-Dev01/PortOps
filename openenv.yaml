@@ -63,9 +63,9 @@ tasks:
       hazmat_constraints: false
     grader:
       type: "deterministic"
-      formula: "max(0.0, 1.0 - 0.2 * (actual_moves - optimal_moves))"
-      zero_condition: "target_not_retrieved_within_8_steps"
-      score_range: [0.0, 1.0]
+      formula: "max(0.01, min(0.99, 1.0 - 0.2 * (actual_moves - optimal_moves)))"
+      zero_condition: "target_not_retrieved_within_8_steps_yields_0_01"
+      score_range: [0.01, 0.99]
 
   - id: 2
     name: "Temporal Allocation"
@@ -84,11 +84,11 @@ tasks:
       hazmat_constraints: false
     grader:
       type: "deterministic"
-      formula: "max(0.0, 1.0 - 0.15 * temporal_inversions)"
+      formula: "max(0.01, min(0.99, 1.0 - 0.15 * temporal_inversions))"
       temporal_inversion_definition: >
         A pair where a container with a later departure_day is physically
         stacked directly on top of a container with an earlier departure_day.
-      score_range: [0.0, 1.0]
+      score_range: [0.01, 0.99]
 
   - id: 3
     name: "Hazmat and Weight Constraints"
@@ -115,10 +115,10 @@ tasks:
           penalty: "immediate_zero"
     grader:
       type: "deterministic"
-      formula: "max(0.0, 1.0 - 0.1 * unnecessary_steps)"
+      formula: "max(0.01, min(0.99, 1.0 - 0.1 * unnecessary_steps))"
       unnecessary_steps_definition: "steps_taken - minimum_required_steps (4)"
-      zero_condition: "any_fatal_constraint_violation"
-      score_range: [0.0, 1.0]
+      zero_condition: "any_fatal_constraint_violation_yields_0_01"
+      score_range: [0.01, 0.99]
 
 # ─── API Endpoints ─────────────────────────────────────────────
 api:

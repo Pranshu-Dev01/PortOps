@@ -286,7 +286,8 @@ class PortOpsEnv:
 
     def step(self, action: ActionSpace) -> Tuple[ObservationSpace, float, bool, Dict[str, Any]]:
         if self._done:
-            return self._build_observation(), 0.0, True, {"reason": "Done", "score": self._compute_final_score()}
+            score = self._compute_final_score()
+            return self._build_observation(), score, True, {"reason": "Done", "score": score}
 
         try:
             action_type, args = action.parse()
@@ -302,7 +303,7 @@ class PortOpsEnv:
         if self._fatal_error:
             self._done = True
             score = self._compute_final_score()
-            return self._build_observation(), 0.0, True, {"reason": "Fatal error", "score": score}
+            return self._build_observation(), score, True, {"reason": "Fatal error", "score": score}
 
         if self._is_task_complete() or self._step_count >= MAX_STEPS:
             self._done = True
@@ -372,16 +373,16 @@ class PortOpsEnv:
         return max(0.01, min(0.99, score))
 
     def _grade_task1(self) -> float:
-        if self._outbound_requests: return 0.0
-        return max(0.0, 1.0 - 0.2 * (self._step_count - self._opt_moves))
+        if self._outbound_requests: return 0.01
+        return max(0.01, min(0.99, 1.0 - 0.2 * (self._step_count - self._opt_moves)))
 
     def _grade_task2(self) -> float:
         inv = _count_temporal_inversions(self._yard)
-        return max(0.0, 1.0 - 0.15 * inv)
+        return max(0.01, min(0.99, 1.0 - 0.15 * inv))
 
     def _grade_task3(self) -> float:
-        if not self._is_task_complete(): return 0.0
-        return max(0.0, 1.0 - 0.1 * (self._step_count - 4))
+        if not self._is_task_complete(): return 0.01
+        return max(0.01, min(0.99, 1.0 - 0.1 * (self._step_count - 4)))
 
     def _compute_safe_moves(self) -> List[str]:
         safe = []
