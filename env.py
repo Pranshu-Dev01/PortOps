@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field, model_validator
 NUM_BAYS: int = 5  # width of the yard
 MAX_TIERS: int = 4  # maximum stack height per bay
 MAX_STEPS: int = 8  # hard episode limit across all tasks
+MIN_SCORE: float = 0.01
+MAX_SCORE: float = 0.99
 
 
 # ─────────────────────────────────────────────
@@ -436,7 +438,7 @@ class PortOpsEnv:
         return False
 
     def _compute_final_score(self) -> float:
-        score = 0.0
+        score = MIN_SCORE
         if not self._fatal_error:
             if self._task_id == 1:
                 score = self._grade_task1()
@@ -444,21 +446,24 @@ class PortOpsEnv:
                 score = self._grade_task2()
             elif self._task_id == 3:
                 score = self._grade_task3()
-        return max(0.0, min(1.0, score))
+        return max(MIN_SCORE, min(MAX_SCORE, score))
 
     def _grade_task1(self) -> float:
         if self._outbound_requests:
-            return 0.0
-        return max(0.0, min(1.0, 1.0 - 0.2 * (self._step_count - self._opt_moves)))
+            return MIN_SCORE
+        return max(
+            MIN_SCORE,
+            min(MAX_SCORE, 1.0 - 0.2 * (self._step_count - self._opt_moves)),
+        )
 
     def _grade_task2(self) -> float:
         inv = _count_temporal_inversions(self._yard)
-        return max(0.0, min(1.0, 1.0 - 0.15 * inv))
+        return max(MIN_SCORE, min(MAX_SCORE, 1.0 - 0.15 * inv))
 
     def _grade_task3(self) -> float:
         if not self._is_task_complete():
-            return 0.0
-        return max(0.0, min(1.0, 1.0 - 0.1 * (self._step_count - 4)))
+            return MIN_SCORE
+        return max(MIN_SCORE, min(MAX_SCORE, 1.0 - 0.1 * (self._step_count - 4)))
 
     def _compute_safe_moves(self) -> List[str]:
         safe = []

@@ -144,13 +144,13 @@ Returns the raw internal state (JSON).
 
 ## Scoring
 
-| Task   | Formula                                                               |
-| ------ | --------------------------------------------------------------------- |
-| Task 1 | `max(0.0, 1.0 - 0.2 × (actual_moves - optimal_moves))`                |
-| Task 2 | `max(0.0, 1.0 - 0.15 × temporal_inversions)`                          |
-| Task 3 | `max(0.0, 1.0 - 0.1 × unnecessary_steps)` — or **0.0** on fatal error |
+| Task   | Formula                                                            |
+| ------ | ------------------------------------------------------------------ |
+| Task 1 | `max(0.01, min(0.99, 1.0 - 0.2 × (actual_moves - optimal_moves)))` |
+| Task 2 | `max(0.01, min(0.99, 1.0 - 0.15 × temporal_inversions))`           |
+| Task 3 | `max(0.01, min(0.99, 1.0 - 0.1 × unnecessary_steps))`              |
 
-### Task 3 Fatal Errors (score = 0.0 immediately)
+### Task 3 Fatal Errors (score = 0.01 immediately)
 
 - ⛔ Placing a **Heavy** container on top of a **Light** container
 - ⛔ Placing a **Hazmat** container in a bay **adjacent** to another hazmat bay
@@ -186,7 +186,7 @@ This script checks:
 - Dockerfile builds successfully
 - `openenv validate --verbose` passes
 - root `inference.py` runs and emits START/STEP/END logs
-- all three graders return final scores in `[0.0, 1.0]`
+- all three graders return final scores in `(0.0, 1.0)`
 
 ---
 

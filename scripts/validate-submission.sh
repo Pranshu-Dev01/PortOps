@@ -24,20 +24,25 @@ run_with_timeout() {
   fi
 }
 
-PING_URL="${1:-}"
-REPO_DIR="${2:-.}"
+ARG1="${1:-}"
+ARG2="${2:-}"
+REPO_DIR="."
+PING_URL=""
+
+if [ -n "$ARG1" ] && [[ "$ARG1" =~ ^https?:// ]]; then
+  PING_URL="$ARG1"
+  REPO_DIR="${ARG2:-.}"
+elif [ -n "$ARG1" ]; then
+  REPO_DIR="$ARG1"
+  PING_URL="${HF_SPACE_URL:-}"
+else
+  REPO_DIR="${ARG2:-.}"
+fi
+
 if ! REPO_DIR="$(cd "$REPO_DIR" 2>/dev/null && pwd)"; then
   echo "Repo path not found: ${2:-.}"
   exit 1
 fi
-
-if [ -z "$PING_URL" ]; then
-  echo "Usage: $0 <ping_url> [repo_dir]"
-  echo "Example: $0 https://my-space.hf.space ."
-  exit 1
-fi
-
-PING_URL="${PING_URL%/}"
 
 # Load local .env so validator checks match repo configuration.
 if [ -f "$REPO_DIR/.env" ]; then
@@ -46,6 +51,19 @@ if [ -f "$REPO_DIR/.env" ]; then
   source "$REPO_DIR/.env"
   set +a
 fi
+
+if [ -z "$PING_URL" ]; then
+  PING_URL="${HF_SPACE_URL:-}"
+fi
+
+if [ -z "$PING_URL" ]; then
+  echo "Usage: $0 [ping_url] [repo_dir]"
+  echo "Provide ping_url directly or set HF_SPACE_URL in your shell/.env."
+  echo "Example: HF_SPACE_URL=https://my-space.hf.space $0 ."
+  exit 1
+fi
+
+PING_URL="${PING_URL%/}"
 
 log()  { printf "[%s] %b\n" "$(date -u +%H:%M:%S)" "$*"; }
 pass() { log "${GREEN}PASSED${NC} -- $1"; }
@@ -204,7 +222,7 @@ scores = {
 }
 
 for task, score in scores.items():
-    if not (0.0 <= float(score) <= 1.0):
+  if not (0.0 < float(score) < 1.0):
         raise SystemExit(f"{task} score out of range: {score}")
 
 print(scores)
@@ -212,7 +230,7 @@ PY
 )
 
 if [ $? -eq 0 ]; then
-  pass "All task graders returned scores in [0.0, 1.0]"
+  pass "All task graders returned scores in (0.0, 1.0)"
 else
   fail "Task grader score-range check failed"
   exit 1
