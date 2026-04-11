@@ -13,8 +13,8 @@ Run with:
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 # Allow imports from project root when launched from subdirectory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,10 +35,13 @@ from env import (
 # Request / Response Schemas
 # ─────────────────────────────────────────
 
+
 class ResetRequest(BaseModel):
     task_id: int = Field(
-        default=1, ge=1, le=3,
-        description="Task to run: 1=Extraction, 2=Temporal Allocation, 3=Hazmat/Weight"
+        default=1,
+        ge=1,
+        le=3,
+        description="Task to run: 1=Extraction, 2=Temporal Allocation, 3=Hazmat/Weight",
     )
     seed: int = Field(
         default=42, description="Random seed for deterministic environment setup"
@@ -52,7 +55,7 @@ class StepRequest(BaseModel):
             "Action command string. "
             "Format: 'move(CONTAINER_ID, BAY_NUMBER)' or 'retrieve(CONTAINER_ID)'. "
             "Bay numbers are 1-based (1–5)."
-        )
+        ),
     )
 
 
@@ -81,7 +84,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -93,6 +96,7 @@ _env = PortOpsEnv()
 # ─────────────────────────────────────────
 # Endpoints
 # ─────────────────────────────────────────
+
 
 @app.get("/health", tags=["meta"])
 def health_check() -> Dict[str, str]:
@@ -142,7 +146,16 @@ def step(body: StepRequest) -> StepResponse:
     Execute one action in the environment.
     Returns the updated observation, reward, done flag, and info dict.
     """
-    action = ActionSpace(command=body.command)
+    command = body.command.strip()
+    if not command:
+        raise HTTPException(status_code=400, detail="Command must not be empty")
+
+    action = ActionSpace(command=command)
+    try:
+        action.parse()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     obs, reward, done, info = _env.step(action)
     return StepResponse(
         observation=obs,
@@ -166,6 +179,7 @@ def state() -> Dict[str, Any]:
 # ─────────────────────────────────────────
 def main():
     import uvicorn
+
     uvicorn.run(
         "server.app:app",
         host="0.0.0.0",
@@ -173,6 +187,7 @@ def main():
         reload=False,
         log_level="info",
     )
+
 
 if __name__ == "__main__":
     main()

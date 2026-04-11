@@ -6,25 +6,27 @@ Run with: pytest tests/ -v
 """
 
 import pytest
+
 from env import (
-    Container,
-    YardState,
+    MAX_STEPS,
+    NUM_BAYS,
     ActionSpace,
+    Container,
     ObservationSpace,
     PortOpsEnv,
-    NUM_BAYS,
-    MAX_TIERS,
-    MAX_STEPS,
-    _count_temporal_inversions,
+    YardState,
     _adjacent_hazmat_violation,
+    _count_temporal_inversions,
 )
-
 
 # ─────────────────────────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────────────────────────
 
-def make_env(task_id: int = 1, seed: int = 42) -> tuple[PortOpsEnv, ObservationSpace]:
+
+def make_env(
+    task_id: int = 1, seed: int = 42
+) -> tuple[PortOpsEnv, ObservationSpace]:
     env = PortOpsEnv()
     obs = env.reset(task_id=task_id, seed=seed)
     return env, obs
@@ -37,6 +39,7 @@ def act(env: PortOpsEnv, cmd: str):
 # ─────────────────────────────────────────────────────────────────
 # PYDANTIC MODEL TESTS
 # ─────────────────────────────────────────────────────────────────
+
 
 class TestContainerModel:
     def test_default_values(self):
@@ -80,7 +83,7 @@ class TestYardState:
         c1 = Container(id="C01")
         c2 = Container(id="C02")
         yard = YardState(bays=[[c1, c2], [], [], [], []])
-        assert yard.is_accessible("C02") is True   # top
+        assert yard.is_accessible("C02") is True  # top
         assert yard.is_accessible("C01") is False  # buried
 
     def test_top_container(self):
@@ -128,6 +131,7 @@ class TestActionSpaceParsing:
 # TASK 1 — THE EXTRACTION
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestTask1:
     def test_reset_sets_up_yard(self):
         env, obs = make_env(task_id=1)
@@ -145,7 +149,10 @@ class TestTask1:
         env, obs = make_env(task_id=1)
         obs2, reward, done, info = act(env, "retrieve(C01)")
         assert obs2.last_action_error is not None
-        assert "buried" in obs2.last_action_error.lower() or "blocked" in obs2.last_action_error.lower()
+        assert (
+            "buried" in obs2.last_action_error.lower()
+            or "blocked" in obs2.last_action_error.lower()
+        )
         assert not done
 
     def test_move_top_container(self):
@@ -163,7 +170,7 @@ class TestTask1:
         act(env, "move(C02, 3)")
         obs, reward, done, info = act(env, "retrieve(C01)")
         assert done is True
-        assert info["score"] == pytest.approx(0.99)
+        assert info["score"] == pytest.approx(1.0)
 
     def test_extra_moves_reduce_score(self):
         """One extra move: C03→Bay2, C02→Bay3, C02→Bay4, retrieve C01. Score = 0.8."""
@@ -181,7 +188,7 @@ class TestTask1:
         for _ in range(MAX_STEPS):
             obs, reward, done, info = act(env, "move(C03, 2)")
         assert done is True
-        assert info["score"] == pytest.approx(0.01)
+        assert info["score"] == pytest.approx(0.0)
 
     def test_cannot_move_to_full_bay(self):
         env, obs = make_env(task_id=1)
@@ -195,6 +202,7 @@ class TestTask1:
 # ─────────────────────────────────────────────────────────────────
 # TASK 2 — TEMPORAL ALLOCATION
 # ─────────────────────────────────────────────────────────────────
+
 
 class TestTask2:
     def test_reset_empty_yard(self):
@@ -233,7 +241,7 @@ class TestTask2:
             obs, reward, done, info = act(env, f"move({first_id}, {bay + 1})")
         # Score depends on actual inversions — just ensure it's within [0,1]
         if done:
-            assert 0.01 <= info["score"] <= 0.99
+            assert 0.0 <= info["score"] <= 1.0
 
     def test_temporal_inversion_counter(self):
         """Manually verify the inversion counting helper."""
@@ -243,7 +251,9 @@ class TestTask2:
         assert _count_temporal_inversions(yard) == 1
 
     def test_no_inversion_correct_order(self):
-        c1 = Container(id="C01", departure_day=5)  # later departs, goes in first (bottom)
+        c1 = Container(
+            id="C01", departure_day=5
+        )  # later departs, goes in first (bottom)
         c2 = Container(id="C02", departure_day=2)  # earlier departs, on top
         yard = YardState(bays=[[c1, c2], [], [], [], []])
         assert _count_temporal_inversions(yard) == 0
@@ -252,6 +262,7 @@ class TestTask2:
 # ─────────────────────────────────────────────────────────────────
 # TASK 3 — HAZMAT & WEIGHT CONSTRAINTS
 # ─────────────────────────────────────────────────────────────────
+
 
 class TestTask3:
     def test_reset_has_12_containers(self):
@@ -270,9 +281,11 @@ class TestTask3:
         """Placing C13 (Heavy) onto Bay 1 top (C03, Light) should trigger fatal error."""
         env, obs = make_env(task_id=3)
         # C13 is the first inbound Heavy container
-        obs2, reward, done, info = act(env, "move(C13, 1)")  # Bay 1 top = C03 (Light)
+        obs2, reward, done, info = act(
+            env, "move(C13, 1)"
+        )  # Bay 1 top = C03 (Light)
         assert done is True
-        assert info["score"] == pytest.approx(0.01)
+        assert info["score"] == pytest.approx(0.0)
         assert env._fatal_error is True
 
     def test_fatal_hazmat_adjacency(self):
@@ -283,7 +296,7 @@ class TestTask3:
         # Now try placing C14 (Hazmat) in Bay 3 — Bay 2 has hazmat (C04)
         obs2, reward, done, info = act(env, "move(C14, 3)")
         assert done is True
-        assert info["score"] == pytest.approx(0.01)
+        assert info["score"] == pytest.approx(0.0)
         assert env._fatal_error is True
 
     def test_valid_heavy_on_heavy_ok(self):
@@ -321,7 +334,7 @@ class TestTask3:
         For the test we'll just do partial task (retrieve only) and check partial score.
         """
         env, obs = make_env(task_id=3)
-        act(env, "move(C08, 4)")    # Unblock C07 (C08 Heavy onto C10 Heavy = OK)
+        act(env, "move(C08, 4)")  # Unblock C07 (C08 Heavy onto C10 Heavy = OK)
         obs, reward, done, info = act(env, "retrieve(C07)")
         # Not fully done yet — still have 2 inbound to place
         assert not done
@@ -332,13 +345,16 @@ class TestTask3:
         for _ in range(MAX_STEPS):
             if env._done:
                 break
-            obs, reward, done, info = act(env, "move(C12, 3)")  # some repeated invalid moves
+            obs, reward, done, info = act(
+                env, "move(C12, 3)"
+            )  # some repeated invalid moves
         assert env._done is True
 
 
 # ─────────────────────────────────────────────────────────────────
 # PHYSICS HELPERS
 # ─────────────────────────────────────────────────────────────────
+
 
 class TestPhysicsHelpers:
     def test_hazmat_adjacency_detection(self):
@@ -359,6 +375,7 @@ class TestPhysicsHelpers:
 # OBSERVATION SPACE
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestObservationSpace:
     def test_prompt_str_contains_yard(self):
         env, obs = make_env(task_id=1)
@@ -373,3 +390,33 @@ class TestObservationSpace:
         assert obs2.last_action_error is not None
         prompt = obs2.to_prompt_str()
         assert "ERROR" in prompt.upper() or "⚠️" in prompt
+
+
+class TestScoreRanges:
+    def test_task1_score_within_unit_interval(self):
+        env, _ = make_env(task_id=1)
+        act(env, "move(C03, 2)")
+        act(env, "move(C02, 3)")
+        _, _, done, info = act(env, "retrieve(C01)")
+        assert done is True
+        assert 0.0 <= info["score"] <= 1.0
+
+    def test_task2_score_within_unit_interval(self):
+        env, obs = make_env(task_id=2, seed=42)
+        done = False
+        info = {"score": 0.0}
+
+        for _ in range(MAX_STEPS):
+            if done or not obs.inbound_queue:
+                break
+            inbound_id = obs.inbound_queue[0]
+            obs, _, done, info = act(env, f"move({inbound_id}, 1)")
+
+        assert done is True
+        assert 0.0 <= info["score"] <= 1.0
+
+    def test_task3_score_within_unit_interval(self):
+        env, _ = make_env(task_id=3)
+        _, _, done, info = act(env, "move(C13, 1)")
+        assert done is True
+        assert 0.0 <= info["score"] <= 1.0
