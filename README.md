@@ -1,10 +1,11 @@
 ---
-title: PortOps-LLM Environment
+title: PortOps-LLM
 emoji: 🚢
 colorFrom: blue
 colorTo: indigo
 sdk: docker
 pinned: false
+license: gpl-3.0
 ---
 
 # PortOps-LLM 🚢
@@ -27,11 +28,11 @@ The agent receives a **text-based observation** of the yard and must issue **tex
 
 ## Tasks
 
-| # | Name | Difficulty | Description |
-|---|------|------------|-------------|
-| 1 | The Extraction | 🟢 Easy | Unstack and retrieve a buried container (no weight/hazmat constraints) |
-| 2 | Temporal Allocation | 🟡 Medium | Place 8 inbound containers sorted by departure day |
-| 3 | Hazmat & Weight Constraints | 🔴 Hard | Dense yard — fatal violations on Heavy-on-Light stacking or Hazmat adjacency |
+| #   | Name                        | Difficulty | Description                                                                  |
+| --- | --------------------------- | ---------- | ---------------------------------------------------------------------------- |
+| 1   | The Extraction              | 🟢 Easy    | Unstack and retrieve a buried container (no weight/hazmat constraints)       |
+| 2   | Temporal Allocation         | 🟡 Medium  | Place 8 inbound containers sorted by departure day                           |
+| 3   | Hazmat & Weight Constraints | 🔴 Hard    | Dense yard — fatal violations on Heavy-on-Light stacking or Hazmat adjacency |
 
 ---
 
@@ -48,8 +49,11 @@ PortOps/
 ├── Dockerfile          # Lightweight Docker image for HF Spaces (port 7860)
 ├── requirements.txt    # Python dependencies
 ├── pyproject.toml      # PEP 517 build config (required by openenv validate)
+├── scripts/
+│   └── validate-submission.sh   # Pre-submission validator (Space ping, build, validate, inference, graders)
 └── tests/
-    └── test_env.py     # Unit tests for all 3 tasks
+    ├── test_env.py     # Unit tests for all 3 tasks + grader range checks
+    └── test_api.py     # API endpoint integration tests
 ```
 
 ---
@@ -73,8 +77,18 @@ The interactive API docs will be available at: http://localhost:7860/docs
 ### 3. Run the baseline inference agent
 
 ```bash
-export OPENAI_API_KEY="sk-..."
-python inference.py --task 1 --seed 42 --model gpt-4o-mini --verbose
+export API_BASE_URL="https://router.huggingface.co/v1"
+export MODEL_NAME="Qwen/Qwen2.5-72B-Instruct"
+export HF_TOKEN="hf_..."
+python inference.py --task 1 --seed 42 --base-url http://localhost:7860
+```
+
+The script prints strict evaluator logs only:
+
+```text
+[START] task=<task_name> env=<benchmark> model=<model_name>
+[STEP] step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
+[END] success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
 ```
 
 ### 4. Validate OpenEnv compliance
@@ -88,6 +102,7 @@ openenv validate --verbose
 ## API Reference
 
 ### `POST /reset`
+
 Reset the environment for a task.
 
 ```json
@@ -95,27 +110,31 @@ Reset the environment for a task.
 ```
 
 ### `POST /step`
+
 Execute one action.
 
 ```json
 { "command": "move(C03, 2)" }
 ```
+
 or
+
 ```json
 { "command": "retrieve(C01)" }
 ```
 
 ### `GET /state`
+
 Returns the raw internal state (JSON).
 
 ---
 
 ## Action Format
 
-| Action | Format | Example |
-|--------|--------|---------|
-| Move container | `move(ID, BAY)` | `move(C03, 2)` |
-| Retrieve container | `retrieve(ID)` | `retrieve(C01)` |
+| Action             | Format          | Example         |
+| ------------------ | --------------- | --------------- |
+| Move container     | `move(ID, BAY)` | `move(C03, 2)`  |
+| Retrieve container | `retrieve(ID)`  | `retrieve(C01)` |
 
 - `ID` = container identifier (e.g. `C01`, `C12`)
 - `BAY` = integer 1–5 (1-based)
@@ -125,13 +144,14 @@ Returns the raw internal state (JSON).
 
 ## Scoring
 
-| Task | Formula |
-|------|---------|
-| Task 1 | `max(0.0, 1.0 - 0.2 × (actual_moves - optimal_moves))` |
-| Task 2 | `max(0.0, 1.0 - 0.15 × temporal_inversions)` |
-| Task 3 | `max(0.0, 1.0 - 0.1 × unnecessary_steps)` — or **0.0** on fatal error |
+| Task   | Formula                                                            |
+| ------ | ------------------------------------------------------------------ |
+| Task 1 | `max(0.01, min(0.99, 1.0 - 0.2 × (actual_moves - optimal_moves)))` |
+| Task 2 | `max(0.01, min(0.99, 1.0 - 0.15 × temporal_inversions))`           |
+| Task 3 | `max(0.01, min(0.99, 1.0 - 0.1 × unnecessary_steps))`              |
 
-### Task 3 Fatal Errors (score = 0.0 immediately)
+### Task 3 Fatal Errors (score = 0.01 immediately)
+
 - ⛔ Placing a **Heavy** container on top of a **Light** container
 - ⛔ Placing a **Hazmat** container in a bay **adjacent** to another hazmat bay
 
@@ -153,6 +173,20 @@ For Hugging Face Spaces, the `Dockerfile` is configured to use `sdk: docker` on 
 ```bash
 pytest tests/ -v
 ```
+
+## Pre-Submission Validation
+
+```bash
+./scripts/validate-submission.sh https://your-space.hf.space .
+```
+
+This script checks:
+
+- HF Space `/reset` responds with HTTP 200
+- Dockerfile builds successfully
+- `openenv validate --verbose` passes
+- root `inference.py` runs and emits START/STEP/END logs
+- all three graders return final scores in `(0.0, 1.0)`
 
 ---
 
