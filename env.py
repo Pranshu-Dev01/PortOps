@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 # ─────────────────────────────────────────────
 NUM_BAYS: int = 5       # width of the yard
 MAX_TIERS: int = 4      # maximum stack height per bay
-MAX_STEPS: int = 8      # hard episode limit across all tasks
+MAX_STEPS: int = 8      # hard episode limit across all tasks 
 
 
 # ─────────────────────────────────────────────
@@ -284,10 +284,21 @@ class PortOpsEnv:
             "last_error": self._last_error
         }
 
+    def _get_grading_meta(self) -> Dict[str, Any]:
+        return {
+            "task_id": self._task_id,
+            "actual_moves": self._step_count,
+            "optimal_moves": getattr(self, "_opt_moves", 0),
+            "temporal_inversions": _count_temporal_inversions(self._yard),
+            "unnecessary_steps": max(0, self._step_count - 4),
+        }
+
     def step(self, action: ActionSpace) -> Tuple[ObservationSpace, float, bool, Dict[str, Any]]:
         if self._done:
             score = self._compute_final_score()
-            return self._build_observation(), score, True, {"reason": "Done", "score": score}
+            info = self._get_grading_meta()
+            info.update({"reason": "Done", "score": score})
+            return self._build_observation(), score, True, info
 
         try:
             action_type, args = action.parse()
@@ -303,14 +314,20 @@ class PortOpsEnv:
         if self._fatal_error:
             self._done = True
             score = self._compute_final_score()
-            return self._build_observation(), score, True, {"reason": "Fatal error", "score": score}
+            info = self._get_grading_meta()
+            info.update({"reason": "Fatal error", "score": score})
+            return self._build_observation(), score, True, info
 
         if self._is_task_complete() or self._step_count >= MAX_STEPS:
             self._done = True
             score = self._compute_final_score()
-            return self._build_observation(), score, True, {"score": score}
+            info = self._get_grading_meta()
+            info.update({"score": score})
+            return self._build_observation(), score, True, info
 
-        return self._build_observation(), 0.0, False, {"step": self._step_count}
+        # Return a tiny reward to keep it strictly in (0, 1) if necessary, 
+        # but usually 0.0 is ok for non-terminal. Let's use 0.01 for safety.
+        return self._build_observation(), 0.01, False, {"step": self._step_count}
 
     def _execute_move(self, cid: str, target_idx: int) -> Optional[str]:
         if not (0 <= target_idx < NUM_BAYS): return "Invalid bay"
