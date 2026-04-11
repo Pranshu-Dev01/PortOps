@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import sys
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -192,7 +193,7 @@ def _next_action(
     return fallback
 
 
-def run_episode(task_id: int, seed: int, base_url: str, api_key: str) -> None:
+def run_episode(task_id: int, seed: int, base_url: str, api_key: str) -> bool:
     env = PortOpsClient(base_url)
     task_name = TASK_NAMES.get(task_id, f"task-{task_id}")
 
@@ -200,6 +201,7 @@ def run_episode(task_id: int, seed: int, base_url: str, api_key: str) -> None:
     score = 0.0
     success = False
     steps_taken = 0
+    hard_failed = False
 
     log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
 
@@ -237,9 +239,22 @@ def run_episode(task_id: int, seed: int, base_url: str, api_key: str) -> None:
     except Exception:
         success = False
         score = 0.0
+        hard_failed = True
 
     finally:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+
+    return hard_failed
+
+
+def run_all_tasks(seed: int, base_url: str, api_key: str) -> int:
+    hard_failures = 0
+    for task_id in sorted(TASK_NAMES):
+        if run_episode(
+            task_id=task_id, seed=seed, base_url=base_url, api_key=api_key
+        ):
+            hard_failures += 1
+    return hard_failures
 
 
 def parse_args() -> argparse.Namespace:
@@ -251,9 +266,28 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _task_was_explicitly_provided(argv: Optional[List[str]] = None) -> bool:
+    args = argv if argv is not None else sys.argv[1:]
+    return any(item == "--task" or item.startswith("--task=") for item in args)
+
+
 if __name__ == "__main__":
     args = parse_args()
+    task_explicit = _task_was_explicitly_provided()
     key = args.api_key or HF_TOKEN or os.getenv("OPENAI_API_KEY") or "dummy-key"
-    run_episode(
-        task_id=args.task, seed=args.seed, base_url=args.base_url, api_key=key
-    )
+    if task_explicit:
+        hard_failures = int(
+            run_episode(
+                task_id=args.task,
+                seed=args.seed,
+                base_url=args.base_url,
+                api_key=key,
+            )
+        )
+    else:
+        hard_failures = run_all_tasks(
+            seed=args.seed, base_url=args.base_url, api_key=key
+        )
+
+    if hard_failures > 0:
+        raise SystemExit(1)
