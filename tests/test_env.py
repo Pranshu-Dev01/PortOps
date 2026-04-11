@@ -170,7 +170,7 @@ class TestTask1:
         act(env, "move(C02, 3)")
         obs, reward, done, info = act(env, "retrieve(C01)")
         assert done is True
-        assert info["score"] == pytest.approx(0.99)
+        assert info["score"] == pytest.approx(0.9)
 
     def test_extra_moves_reduce_score(self):
         """One extra move: C03→Bay2, C02→Bay3, C02→Bay4, retrieve C01. Score = 0.8."""

@@ -13,7 +13,7 @@ NUM_BAYS: int = 5  # width of the yard
 MAX_TIERS: int = 4  # maximum stack height per bay
 MAX_STEPS: int = 8  # hard episode limit across all tasks
 MIN_SCORE: float = 0.01
-MAX_SCORE: float = 0.99
+MAX_SCORE: float = 0.9
 
 
 # ─────────────────────────────────────────────
@@ -460,17 +460,17 @@ class PortOpsEnv:
             return MIN_SCORE
         return max(
             MIN_SCORE,
-            min(MAX_SCORE, 1.0 - 0.2 * (self._step_count - self._opt_moves)),
+            min(MAX_SCORE, 0.9 - 0.1 * (self._step_count - self._opt_moves)),
         )
 
     def _grade_task2(self) -> float:
         inv = _count_temporal_inversions(self._yard)
-        return max(MIN_SCORE, min(MAX_SCORE, 1.0 - 0.15 * inv))
+        return max(MIN_SCORE, min(MAX_SCORE, 0.9 - 0.1 * inv))
 
     def _grade_task3(self) -> float:
         if not self._is_task_complete():
             return MIN_SCORE
-        return max(MIN_SCORE, min(MAX_SCORE, 1.0 - 0.1 * (self._step_count - 4)))
+        return max(MIN_SCORE, min(MAX_SCORE, 0.9 - 0.1 * (self._step_count - 4)))
 
     def _compute_safe_moves(self) -> List[str]:
         safe = []
