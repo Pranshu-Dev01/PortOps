@@ -39,6 +39,14 @@ fi
 
 PING_URL="${PING_URL%/}"
 
+# Load local .env so validator checks match repo configuration.
+if [ -f "$REPO_DIR/.env" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$REPO_DIR/.env"
+  set +a
+fi
+
 log()  { printf "[%s] %b\n" "$(date -u +%H:%M:%S)" "$*"; }
 pass() { log "${GREEN}PASSED${NC} -- $1"; }
 fail() { log "${RED}FAILED${NC} -- $1"; }
