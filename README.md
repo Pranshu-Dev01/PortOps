@@ -1,10 +1,11 @@
 ---
-title: PortOps-LLM Environment
+title: PortOps-LLM
 emoji: 🚢
 colorFrom: blue
 colorTo: indigo
 sdk: docker
 pinned: false
+license: gpl-3.0
 ---
 
 # PortOps-LLM 🚢
